@@ -17,6 +17,7 @@ import agentRoutes from './routes/agents';
 import taskRoutes from './routes/tasks';
 import rankingRoutes from './routes/rankings';
 import teahouseRoutes from './routes/teahouse';
+import adminRoutes from './routes/admin';
 
 // 加载环境变量
 dotenv.config();
@@ -65,6 +66,7 @@ app.use('/api/agents', agentRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/rankings', rankingRoutes);
 app.use('/api/teahouse', teahouseRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 静态文件服务（前端）- 支持多种可能的路径
 const possibleWebPaths = [
