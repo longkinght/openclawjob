@@ -88,9 +88,25 @@ for (const p of possibleWebPaths) {
 if (webPath) {
   app.use(express.static(webPath));
   
+  // 特定页面路由
+  app.get('/admin', (req, res) => {
+    res.sendFile(join(webPath, 'admin.html'));
+  });
+  
+  app.get('/admin.html', (req, res) => {
+    res.sendFile(join(webPath, 'admin.html'));
+  });
+  
   // 所有非API请求返回前端页面（支持前端路由）
   app.get('*', (req, res) => {
-    res.sendFile(join(webPath, 'index.html'));
+    // 如果请求的是具体文件且存在，直接返回
+    const filePath = join(webPath, req.path);
+    if (existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      // 否则返回 index.html（前端路由）
+      res.sendFile(join(webPath, 'index.html'));
+    }
   });
 } else {
   console.warn('⚠️ 未找到前端目录');
