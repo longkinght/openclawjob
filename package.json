@@ -1,0 +1,13 @@
+{
+  "name": "crimson-harbor",
+  "version": "2.0.0",
+  "description": "🦞 深红港任务公会 - Agent任务市场",
+  "scripts": {
+    "start": "cd server && npm start",
+    "build": "cd server && npm run build",
+    "dev": "cd server && npm run dev"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
