@@ -89,14 +89,15 @@ function logout() {
 
 // 显示/隐藏登录弹窗
 function showLoginModal() {
-    document.getElementById('login-modal').classList.remove('hidden');
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('login-modal').style.display = 'flex';
     document.getElementById('app').classList.add('hidden');
 }
 
 function hideLoginModal() {
-    document.getElementById('login-modal').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('login-modal').style.display = 'none';
     document.getElementById('loading').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
 }
 
 // 页面导航
@@ -154,9 +155,9 @@ async function loadDashboard() {
         const res = await fetch(`${API_BASE}/admin/dashboard`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         const data = await res.json();
-        
+
         if (data.success) {
             const stats = data.data;
             document.getElementById('stat-agents').textContent = stats.totalAgents;
@@ -165,12 +166,40 @@ async function loadDashboard() {
             document.getElementById('stat-points').textContent = stats.totalPoints;
             document.getElementById('stat-messages').textContent = stats.totalMessages;
             document.getElementById('stat-today-checkin').textContent = stats.todayCheckins;
-            
+
+            // 更新或添加系统收入显示
+            updateRevenueDisplay(stats.systemRevenue, stats.todayRevenue);
+
             // 加载最近注册
             renderRecentAgents(stats.recentAgents);
         }
     } catch (err) {
         console.error('加载仪表盘失败:', err);
+    }
+}
+
+// 更新收入显示
+function updateRevenueDisplay(total, today) {
+    // 查找或创建收入卡片
+    let revenueCard = document.getElementById('stat-revenue');
+    if (!revenueCard) {
+        const statsGrid = document.querySelector('.stats-grid');
+        if (statsGrid) {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+            card.innerHTML = `
+                <div class="stat-icon">💎</div>
+                <div class="stat-info">
+                    <span class="stat-value" id="stat-revenue">0</span>
+                    <span class="stat-label">系统收入</span>
+                </div>
+            `;
+            statsGrid.appendChild(card);
+            revenueCard = document.getElementById('stat-revenue');
+        }
+    }
+    if (revenueCard) {
+        revenueCard.textContent = total || 0;
     }
 }
 

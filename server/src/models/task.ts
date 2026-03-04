@@ -166,11 +166,9 @@ export class TaskModel {
     });
 
     if (task.assignedTo) {
-      // 执行者获得：悬赏金额 - 平台抽成
-      const executorReward = task.reward - (task.platformFee || 0);
-      // 加上星级奖励
+      // 执行者获得：完整悬赏金额 + 星级奖励（抽成已单独收取，不归执行者）
       const bonusPoints = this.calculatePoints(task.starLevel, { goodReview: (rating || 0) >= 4, emergency: task.tags?.urgency === 'emergency' });
-      const totalReward = Math.max(0, executorReward) + bonusPoints;
+      const totalReward = task.reward + bonusPoints;
       
       await AgentModel.addPoints(task.assignedTo, totalReward, 'earn');
 
@@ -186,6 +184,9 @@ export class TaskModel {
           stats: agent.stats
         });
       }
+      
+      // 记录系统收入（抽成）
+      await this.recordSystemRevenue(task.platformFee || 0, 'task_fee', task.id);
     }
 
     return this.findById(taskId);
@@ -195,6 +196,46 @@ export class TaskModel {
     if (role === 'publisher') return db.tasks.filter(t => t.publisherId === agentId);
     if (role === 'executor') return db.tasks.filter(t => t.assignedTo === agentId);
     return db.tasks.filter(t => t.publisherId === agentId || t.assignedTo === agentId);
+  }
+
+  /**
+   * 记录系统收入
+   */
+  static async recordSystemRevenue(amount: number, type: string, sourceId: string): Promise<void> {
+    if (amount <= 0) return;
+    
+    const revenue = {
+      id: `rev_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      amount,
+      type,
+      sourceId,
+      createdAt: new Date().toISOString()
+    };
+    
+    if (!db.systemRevenue) {
+      (db as any).systemRevenue = [];
+    }
+    (db as any).systemRevenue.push(revenue);
+    db.save();
+  }
+
+  /**
+   * 获取系统收入统计
+   */
+  static async getSystemRevenueStats(): Promise<{ total: number; today: number; byType: Record<string, number> }> {
+    const revenues = (db as any).systemRevenue || [];
+    const today = new Date().toISOString().split('T')[0];
+    
+    const total = revenues.reduce((sum: number, r: any) => sum + r.amount, 0);
+    const todayRevenues = revenues.filter((r: any) => r.createdAt.startsWith(today));
+    const todayTotal = todayRevenues.reduce((sum: number, r: any) => sum + r.amount, 0);
+    
+    const byType: Record<string, number> = {};
+    revenues.forEach((r: any) => {
+      byType[r.type] = (byType[r.type] || 0) + r.amount;
+    });
+    
+    return { total, today: todayTotal, byType };
   }
 }
 

@@ -100,6 +100,7 @@ async function adminAuth(req: any, res: any, next: any) {
 router.get('/dashboard', adminAuth, async (req, res) => {
     try {
         const today = new Date().toISOString().split('T')[0];
+        const revenueStats = await TaskModel.getSystemRevenueStats();
         
         const stats = {
             totalAgents: db.agents.length,
@@ -108,6 +109,9 @@ router.get('/dashboard', adminAuth, async (req, res) => {
             totalMessages: db.messages.length,
             totalPoints: db.agents.reduce((sum, a) => sum + a.totalPoints, 0),
             todayCheckins: db.agents.filter(a => a.lastCheckInDate === today).length,
+            systemRevenue: revenueStats.total,
+            todayRevenue: revenueStats.today,
+            revenueByType: revenueStats.byType,
             recentAgents: db.agents
                 .slice(-10)
                 .reverse()
