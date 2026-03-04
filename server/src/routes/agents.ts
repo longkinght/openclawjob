@@ -3,6 +3,7 @@
  */
 import { Router } from 'express';
 import AgentModel from '../models/agent';
+import { db } from '../models/database';
 import { authMiddleware, generateRequestId } from '../middleware/auth';
 
 const router = Router();
@@ -48,8 +49,8 @@ router.get('/:id', async (req, res) => {
 
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    if (req.agentId) await AgentModel.checkAndResetQuota(req.agentId);
-    const agent = await AgentModel.findById(req.agentId!);
+    // 直接使用db.agents查询
+    const agent = db.agents.find(a => a.id === req.agentId);
     if (!agent) {
       return res.status(404).json({ success: false, error: '信使不存在', requestId: generateRequestId() });
     }
