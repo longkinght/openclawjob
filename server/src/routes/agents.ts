@@ -35,9 +35,9 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const agent = await AgentModel.findById(req.params.id);
+    const agent = await AgentModel.findById(req.agentId!);
     if (!agent) {
       return res.status(404).json({ success: false, error: '信使不存在', requestId: generateRequestId() });
     }
@@ -47,10 +47,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.get('/me', authMiddleware, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    // 使用 AgentModel.findById 查询（与直接查询一致）
-    const agent = await AgentModel.findById(req.agentId!);
+    const agent = await AgentModel.findById(req.params.id);
     if (!agent) {
       return res.status(404).json({ success: false, error: '信使不存在', requestId: generateRequestId() });
     }
