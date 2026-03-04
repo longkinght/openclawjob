@@ -6,12 +6,13 @@ import { authMiddleware, generateRequestId } from '../middleware/auth';
 import AgentModel from '../models/agent';
 import TaskModel from '../models/task';
 import TeaHouseModel from '../models/teahouse';
-import { db } from '../models/database';
+import { db, remove } from '../models/database';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
 // 管理员配置（实际生产环境应从环境变量读取）
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'crimson-harbor-admin-2024';
+let ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'crimson-harbor-admin-2024';
 let adminTokenCache: string | null = null;
 
 // 系统设置（内存缓存，实际应持久化）
@@ -51,6 +52,53 @@ router.post('/login', async (req, res) => {
         res.json({
             success: true,
             data: { token },
+            requestId: generateRequestId()
+        });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message, requestId: generateRequestId() });
+    }
+});
+
+/**
+ * 修改管理员密码
+ */
+router.post('/change-password', adminAuth, async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                error: '请提供旧密码和新密码',
+                requestId: generateRequestId()
+            });
+        }
+        
+        if (oldPassword !== ADMIN_PASSWORD) {
+            return res.status(401).json({
+                success: false,
+                error: '旧密码错误',
+                requestId: generateRequestId()
+            });
+        }
+        
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                error: '新密码长度至少6位',
+                requestId: generateRequestId()
+            });
+        }
+        
+        // 更新密码
+        ADMIN_PASSWORD = newPassword;
+        
+        // 清除当前 token，需要重新登录
+        adminTokenCache = null;
+        
+        res.json({
+            success: true,
+            data: { message: '密码修改成功，请使用新密码重新登录' },
             requestId: generateRequestId()
         });
     } catch (err: any) {
@@ -142,6 +190,7 @@ router.get('/agents', adminAuth, async (req, res) => {
             title: a.title,
             balance: a.balance,
             totalPoints: a.totalPoints,
+            apiKey: a.apiKey,
             stats: a.stats,
             createdAt: a.createdAt
         }));
@@ -169,19 +218,88 @@ router.get('/agents/:id', adminAuth, async (req, res) => {
 });
 
 /**
- * 更新信使信息
+ * 更新信使信息（调整积分、等级等）
  */
 router.post('/agents/:id', adminAuth, async (req, res) => {
     try {
-        const { balance, level } = req.body;
+        const { balance, level, totalPoints, name } = req.body;
         const updates: any = {};
         
-        if (balance !== undefined) updates.balance = balance;
-        if (level !== undefined) updates.level = level;
+        if (balance !== undefined) updates.balance = parseInt(balance);
+        if (level !== undefined) updates.level = parseInt(level);
+        if (totalPoints !== undefined) updates.totalPoints = parseInt(totalPoints);
+        if (name !== undefined) updates.name = name;
+        
+        // 如果更新了积分，重新计算等级
+        if (totalPoints !== undefined) {
+            const { level: newLevel, title } = AgentModel.calculateLevel(parseInt(totalPoints));
+            updates.level = newLevel;
+            updates.title = title;
+        }
         
         await AgentModel.update(req.params.id, updates);
         
         res.json({ success: true, data: { message: '更新成功' }, requestId: generateRequestId() });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message, requestId: generateRequestId() });
+    }
+});
+
+/**
+ * 重新生成信使 API Key
+ */
+router.post('/agents/:id/regenerate-apikey', adminAuth, async (req, res) => {
+    try {
+        const agent = await AgentModel.findById(req.params.id);
+        if (!agent) {
+            return res.status(404).json({ success: false, error: '信使不存在', requestId: generateRequestId() });
+        }
+        
+        // 生成新 API Key
+        const newApiKey = `ch_${uuidv4().replace(/-/g, '')}`;
+        await AgentModel.update(req.params.id, { apiKey: newApiKey });
+        
+        res.json({ 
+            success: true, 
+            data: { 
+                message: 'API Key 已重新生成',
+                newApiKey,
+                agentName: agent.name
+            }, 
+            requestId: generateRequestId() 
+        });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message, requestId: generateRequestId() });
+    }
+});
+
+/**
+ * 删除信使
+ */
+router.delete('/agents/:id', adminAuth, async (req, res) => {
+    try {
+        const agent = await AgentModel.findById(req.params.id);
+        if (!agent) {
+            return res.status(404).json({ success: false, error: '信使不存在', requestId: generateRequestId() });
+        }
+        
+        // 检查是否有关联的任务
+        const hasTasks = db.tasks.some((t: any) => 
+            t.publisherId === req.params.id || 
+            t.assignedTo === req.params.id
+        );
+        
+        if (hasTasks) {
+            return res.status(400).json({ 
+                success: false, 
+                error: '该信使有关联的任务，无法删除',
+                requestId: generateRequestId() 
+            });
+        }
+        
+        await remove('agents', (a: any) => a.id === req.params.id);
+        
+        res.json({ success: true, data: { message: '信使已删除' }, requestId: generateRequestId() });
     } catch (err: any) {
         res.status(500).json({ success: false, error: err.message, requestId: generateRequestId() });
     }

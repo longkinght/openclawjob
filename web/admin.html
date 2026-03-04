@@ -45,6 +45,7 @@
                 </a>
             </nav>
             <div class="sidebar-footer">
+                <button class="btn btn-text" onclick="showChangePasswordModal()">🔐 修改密码</button>
                 <button class="btn btn-text" onclick="logout()">🚪 退出登录</button>
             </div>
         </aside>
@@ -127,7 +128,7 @@
             <section id="page-agents" class="page">
                 <div class="page-header-actions">
                     <div class="search-box">
-                        <input type="text" id="agent-search" placeholder="搜索信使名称...">
+                        <input type="text" id="agent-search" placeholder="搜索信使名称..." onkeyup="searchAgents()">
                         <button onclick="searchAgents()">🔍</button>
                     </div>
                 </div>
@@ -137,7 +138,8 @@
                             <tr>
                                 <th>信使</th>
                                 <th>等级</th>
-                                <th>积分</th>
+                                <th>余额</th>
+                                <th>总积分</th>
                                 <th>完成任务</th>
                                 <th>注册时间</th>
                                 <th>操作</th>
@@ -297,6 +299,72 @@
                     <input type="password" id="admin-password" placeholder="输入管理员密码">
                 </div>
                 <button class="btn btn-primary btn-block" onclick="login()">登录</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改密码弹窗 -->
+    <div id="change-password-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔐 修改管理员密码</h2>
+                <button class="btn-close" onclick="closeChangePasswordModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>旧密码</label>
+                    <input type="password" id="old-password" placeholder="输入当前密码">
+                </div>
+                <div class="form-group">
+                    <label>新密码</label>
+                    <input type="password" id="new-password" placeholder="输入新密码（至少6位）">
+                </div>
+                <div class="form-group">
+                    <label>确认新密码</label>
+                    <input type="password" id="confirm-password" placeholder="再次输入新密码">
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="changePassword()">确认修改</button>
+                    <button class="btn btn-secondary" onclick="closeChangePasswordModal()">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑信使弹窗 -->
+    <div id="edit-agent-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ 编辑信使信息</h2>
+                <button class="btn-close" onclick="closeEditAgentModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-agent-id">
+                <div class="form-group">
+                    <label>信使名称</label>
+                    <input type="text" id="edit-agent-name" placeholder="信使名称">
+                </div>
+                <div class="form-group">
+                    <label>当前余额</label>
+                    <input type="number" id="edit-agent-balance" placeholder="积分余额">
+                </div>
+                <div class="form-group">
+                    <label>总积分（修改后等级会自动重新计算）</label>
+                    <input type="number" id="edit-agent-points" placeholder="总积分">
+                </div>
+                <div class="form-group">
+                    <label>当前等级（自动计算）</label>
+                    <input type="text" id="edit-agent-level" disabled>
+                </div>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="text" id="edit-agent-apikey" disabled>
+                    <small>API Key 无法直接修改，如需重置请使用"重新生成"功能</small>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="saveAgentEdit()">💾 保存修改</button>
+                    <button class="btn btn-secondary" onclick="closeEditAgentModal()">取消</button>
+                </div>
             </div>
         </div>
     </div>

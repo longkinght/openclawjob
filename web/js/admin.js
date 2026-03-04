@@ -9,6 +9,7 @@ const API_BASE = window.location.hostname === 'localhost'
 // 状态管理
 let currentPage = 'dashboard';
 let settings = {};
+let currentEditAgent = null;
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
@@ -247,7 +248,7 @@ async function loadAgents() {
 function renderAgentsTable(agents) {
     const tbody = document.getElementById('agents-table');
     if (!agents || agents.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-text">暂无信使</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-text">暂无信使</td></tr>';
         return;
     }
     
@@ -261,11 +262,14 @@ function renderAgentsTable(agents) {
             </td>
             <td>Lv.${agent.level} ${agent.title}</td>
             <td>${agent.balance}</td>
+            <td>${agent.totalPoints}</td>
             <td>${agent.stats?.tasksCompleted || 0}</td>
             <td>${formatDate(agent.createdAt)}</td>
             <td>
-                <button class="btn btn-text" onclick="viewAgent('${agent.id}')">👁️</button>
-                <button class="btn btn-text" onclick="editAgent('${agent.id}')">✏️</button>
+                <button class="btn btn-text" onclick="viewAgent('${agent.id}')" title="查看详情">👁️</button>
+                <button class="btn btn-text" onclick="showEditAgentModal('${agent.id}')" title="编辑/调整积分">✏️</button>
+                <button class="btn btn-text" onclick="regenerateApiKey('${agent.id}', '${agent.name}')" title="重新生成API Key">🔑</button>
+                <button class="btn btn-text btn-danger" onclick="deleteAgent('${agent.id}', '${agent.name}')" title="删除">🗑️</button>
             </td>
         </tr>
     `).join('');
@@ -273,9 +277,133 @@ function renderAgentsTable(agents) {
 
 // 搜索信使
 function searchAgents() {
-    const query = document.getElementById('agent-search').value;
-    // TODO: 实现搜索
-    alert('搜索功能: ' + query);
+    const query = document.getElementById('agent-search').value.toLowerCase();
+    const rows = document.querySelectorAll('#agents-table tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(query) ? '' : 'none';
+    });
+}
+
+// 显示编辑信使弹窗
+async function showEditAgentModal(id) {
+    try {
+        const token = localStorage.getItem('crimson_harbor_admin_token');
+        const res = await fetch(`${API_BASE}/admin/agents/${id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            currentEditAgent = data.data;
+            
+            document.getElementById('edit-agent-id').value = currentEditAgent.id;
+            document.getElementById('edit-agent-name').value = currentEditAgent.name;
+            document.getElementById('edit-agent-balance').value = currentEditAgent.balance;
+            document.getElementById('edit-agent-points').value = currentEditAgent.totalPoints;
+            document.getElementById('edit-agent-level').value = currentEditAgent.level;
+            document.getElementById('edit-agent-apikey').value = currentEditAgent.apiKey;
+            
+            document.getElementById('edit-agent-modal').classList.remove('hidden');
+        }
+    } catch (err) {
+        alert('加载信使信息失败');
+    }
+}
+
+// 关闭编辑弹窗
+function closeEditAgentModal() {
+    document.getElementById('edit-agent-modal').classList.add('hidden');
+    currentEditAgent = null;
+}
+
+// 保存信使编辑
+async function saveAgentEdit() {
+    if (!currentEditAgent) return;
+    
+    const updates = {
+        name: document.getElementById('edit-agent-name').value,
+        balance: parseInt(document.getElementById('edit-agent-balance').value),
+        totalPoints: parseInt(document.getElementById('edit-agent-points').value)
+    };
+    
+    try {
+        const token = localStorage.getItem('crimson_harbor_admin_token');
+        const res = await fetch(`${API_BASE}/admin/agents/${currentEditAgent.id}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updates)
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            alert('✅ 更新成功');
+            closeEditAgentModal();
+            loadAgents();
+        } else {
+            alert('更新失败: ' + data.error);
+        }
+    } catch (err) {
+        alert('更新失败');
+    }
+}
+
+// 重新生成 API Key
+async function regenerateApiKey(id, name) {
+    if (!confirm(`确定要重新生成 ${name} 的 API Key 吗？\n\n旧 Key 将立即失效，用户需要重新登录！`)) {
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('crimson_harbor_admin_token');
+        const res = await fetch(`${API_BASE}/admin/agents/${id}/regenerate-apikey`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            alert(`✅ API Key 已重新生成\n\n新 Key:\n${data.data.newApiKey}\n\n请复制给用户！`);
+            loadAgents();
+        } else {
+            alert('重新生成失败: ' + data.error);
+        }
+    } catch (err) {
+        alert('重新生成失败');
+    }
+}
+
+// 删除信使
+async function deleteAgent(id, name) {
+    if (!confirm(`确定要删除信使 ${name} 吗？\n\n此操作不可恢复！`)) {
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('crimson_harbor_admin_token');
+        const res = await fetch(`${API_BASE}/admin/agents/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            alert('✅ 信使已删除');
+            loadAgents();
+        } else {
+            alert('删除失败: ' + data.error);
+        }
+    } catch (err) {
+        alert('删除失败');
+    }
 }
 
 // 加载任务列表
@@ -479,6 +607,65 @@ function resetSettings() {
     }
 }
 
+// 显示修改密码弹窗
+function showChangePasswordModal() {
+    document.getElementById('change-password-modal').classList.remove('hidden');
+}
+
+// 关闭修改密码弹窗
+function closeChangePasswordModal() {
+    document.getElementById('change-password-modal').classList.add('hidden');
+    document.getElementById('old-password').value = '';
+    document.getElementById('new-password').value = '';
+    document.getElementById('confirm-password').value = '';
+}
+
+// 修改密码
+async function changePassword() {
+    const oldPassword = document.getElementById('old-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    
+    if (!oldPassword || !newPassword || !confirmPassword) {
+        alert('请填写所有密码字段');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        alert('新密码和确认密码不一致');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        alert('新密码长度至少6位');
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('crimson_harbor_admin_token');
+        const res = await fetch(`${API_BASE}/admin/change-password`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ oldPassword, newPassword })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            alert('✅ 密码修改成功！请使用新密码重新登录');
+            closeChangePasswordModal();
+            logout();
+        } else {
+            alert('密码修改失败: ' + data.error);
+        }
+    } catch (err) {
+        alert('密码修改失败');
+    }
+}
+
 // 工具函数
 function getLevelEmoji(level) {
     if (level >= 8) return '👑';
@@ -528,6 +715,7 @@ function escapeHtml(text) {
 }
 
 // 占位函数
-function viewAgent(id) { alert('查看信使: ' + id); }
-function editAgent(id) { alert('编辑信使: ' + id); }
+function viewAgent(id) { 
+    showEditAgentModal(id);
+}
 function viewTask(id) { alert('查看任务: ' + id); }
