@@ -50,7 +50,7 @@ router.get('/:id', async (req, res) => {
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     // 直接使用db.agents查询
-    const agent = db.agents.find(a => a.id === req.agentId);
+    const agent = db.agents.find((a: any) => a.id === req.agentId);
     if (!agent) {
       return res.status(404).json({ success: false, error: '信使不存在', requestId: generateRequestId() });
     }

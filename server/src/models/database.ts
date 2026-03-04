@@ -1,109 +1,97 @@
 /**
- * 深红港任务公会 - 数据库模型 (内存存储 + 可选文件备份)
- * 适合快速部署和小规模使用
+ * 深红港任务公会 - 数据库模型 (简化版)
  */
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 
-// 使用内存存储作为主存储
-const memoryDb = {
-  agents: [] as any[],
-  tasks: [] as any[],
-  messages: [] as any[],
-  logs: [] as any[],
-  systemRevenue: [] as any[]
-};
+const DATA_DIR = join(process.cwd(), 'data');
+const DB_FILE = join(DATA_DIR, 'db.json');
 
-// 尝试从文件加载初始数据（如果存在）
+// 创建数据目录
+if (!existsSync(DATA_DIR)) {
+  mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// 加载或初始化数据
+let dbData: any = { agents: [], tasks: [], messages: [], logs: [], systemRevenue: [] };
 try {
-  const DATA_DIR = join(process.cwd(), 'data');
-  const DB_FILE = join(DATA_DIR, 'db.json');
-  
   if (existsSync(DB_FILE)) {
-    const fileData = JSON.parse(readFileSync(DB_FILE, 'utf-8'));
-    memoryDb.agents = fileData.agents || [];
-    memoryDb.tasks = fileData.tasks || [];
-    memoryDb.messages = fileData.messages || [];
-    memoryDb.logs = fileData.logs || [];
-    memoryDb.systemRevenue = fileData.systemRevenue || [];
-    console.log('✅ 从文件加载数据成功');
+    dbData = JSON.parse(readFileSync(DB_FILE, 'utf-8'));
+    // 确保所有字段存在
+    if (!dbData.agents) dbData.agents = [];
+    if (!dbData.tasks) dbData.tasks = [];
+    if (!dbData.messages) dbData.messages = [];
+    if (!dbData.logs) dbData.logs = [];
+    if (!dbData.systemRevenue) dbData.systemRevenue = [];
   }
-} catch (err) {
-  console.log('ℹ️ 使用空数据库启动');
+} catch (e) {
+  console.log('创建新数据库');
 }
 
-// 保存到文件（备份）
-function saveToFile() {
+// 保存函数
+export function saveDb() {
   try {
-    const DATA_DIR = join(process.cwd(), 'data');
-    const DB_FILE = join(DATA_DIR, 'db.json');
-    
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
-    }
-    
-    writeFileSync(DB_FILE, JSON.stringify(memoryDb, null, 2));
-  } catch (err) {
-    // 文件保存失败不影响内存存储
-    console.warn('⚠️ 文件备份失败:', err);
+    writeFileSync(DB_FILE, JSON.stringify(dbData, null, 2));
+  } catch (e) {
+    console.error('保存失败:', e);
   }
 }
 
-// 导出数据库对象
+// 导出数据对象
 export const db = {
-  get agents() { return memoryDb.agents; },
-  get tasks() { return memoryDb.tasks; },
-  get messages() { return memoryDb.messages; },
-  get logs() { return memoryDb.logs; },
-  get systemRevenue() { return memoryDb.systemRevenue; },
-  save: () => saveToFile()
+  agents: dbData.agents,
+  tasks: dbData.tasks,
+  messages: dbData.messages,
+  logs: dbData.logs,
+  systemRevenue: dbData.systemRevenue,
+  save: saveDb
 };
 
-// 辅助方法
-export async function findOne<T>(collection: keyof typeof memoryDb, predicate: (item: any) => boolean): Promise<T | null> {
-  const items = memoryDb[collection];
+// 查询辅助函数
+export async function findOne<T>(collection: string, predicate: (item: any) => boolean): Promise<T | null> {
+  const items = (db as any)[collection];
+  if (!Array.isArray(items)) return null;
   const item = items.find(predicate);
   return item ? { ...item } : null;
 }
 
-export async function findMany<T>(collection: keyof typeof memoryDb, predicate: (item: any) => boolean): Promise<T[]> {
-  const items = memoryDb[collection];
-  return items.filter(predicate).map(item => ({ ...item }));
+export async function findMany<T>(collection: string, predicate: (item: any) => boolean): Promise<T[]> {
+  const items = (db as any)[collection];
+  if (!Array.isArray(items)) return [];
+  return items.filter(predicate).map((item: any) => ({ ...item }));
 }
 
-export async function insert<T>(collection: keyof typeof memoryDb, data: T): Promise<T> {
-  memoryDb[collection].push(data);
-  saveToFile();
+export async function insert<T>(collection: string, data: T): Promise<T> {
+  const items = (db as any)[collection];
+  if (!Array.isArray(items)) throw new Error('Invalid collection');
+  items.push(data);
+  saveDb();
   return { ...data };
 }
 
-export async function update<T>(collection: keyof typeof memoryDb, predicate: (item: any) => boolean, updater: (item: any) => void): Promise<T | null> {
-  const items = memoryDb[collection];
+export async function update<T>(collection: string, predicate: (item: any) => boolean, updater: (item: any) => void): Promise<T | null> {
+  const items = (db as any)[collection];
+  if (!Array.isArray(items)) return null;
   const index = items.findIndex(predicate);
   if (index === -1) return null;
-
-  const item = items[index];
-  updater(item);
-  saveToFile();
-  return { ...item };
+  updater(items[index]);
+  saveDb();
+  return { ...items[index] };
 }
 
-export async function remove(collection: keyof typeof memoryDb, predicate: (item: any) => boolean): Promise<boolean> {
-  const items = memoryDb[collection];
+export async function remove(collection: string, predicate: (item: any) => boolean): Promise<boolean> {
+  const items = (db as any)[collection];
+  if (!Array.isArray(items)) return false;
   const index = items.findIndex(predicate);
   if (index === -1) return false;
-
   items.splice(index, 1);
-  saveToFile();
+  saveDb();
   return true;
 }
 
-// 初始化数据库
 export function initDatabase() {
-  console.log('✅ 数据库初始化完成 (内存 + 文件备份模式)');
-  console.log(`   信使数量: ${memoryDb.agents.length}`);
-  console.log(`   任务数量: ${memoryDb.tasks.length}`);
-  console.log(`   留言数量: ${memoryDb.messages.length}`);
+  console.log('✅ 数据库初始化完成');
+  console.log(`   信使: ${db.agents.length}, 任务: ${db.tasks.length}, 留言: ${db.messages.length}`);
 }
 
 export default db;

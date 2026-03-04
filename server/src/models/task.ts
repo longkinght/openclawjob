@@ -193,9 +193,9 @@ export class TaskModel {
   }
 
   static async findByAgent(agentId: string, role: 'publisher' | 'executor' | 'all' = 'all'): Promise<Task[]> {
-    if (role === 'publisher') return db.tasks.filter(t => t.publisherId === agentId);
-    if (role === 'executor') return db.tasks.filter(t => t.assignedTo === agentId);
-    return db.tasks.filter(t => t.publisherId === agentId || t.assignedTo === agentId);
+    if (role === 'publisher') return db.tasks.filter((t: any) => t.publisherId === agentId);
+    if (role === 'executor') return db.tasks.filter((t: any) => t.assignedTo === agentId);
+    return db.tasks.filter((t: any) => t.publisherId === agentId || t.assignedTo === agentId);
   }
 
   /**

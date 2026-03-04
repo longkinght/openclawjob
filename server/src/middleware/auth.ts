@@ -31,7 +31,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
   const apiKey = authHeader.substring(7);
   // 直接使用db.agents查询
-  const agent = db.agents.find(a => a.apiKey === apiKey);
+  const agent = db.agents.find((a: any) => a.apiKey === apiKey);
 
   if (!agent) {
     return res.status(401).json({
@@ -55,7 +55,7 @@ export async function optionalAuthMiddleware(req: Request, res: Response, next: 
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const apiKey = authHeader.substring(7);
-    const agent = db.agents.find(a => a.apiKey === apiKey);
+    const agent = db.agents.find((a: any) => a.apiKey === apiKey);
     if (agent) {
       req.agentId = agent.id;
       req.agent = agent;

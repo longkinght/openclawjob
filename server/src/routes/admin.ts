@@ -105,17 +105,17 @@ router.get('/dashboard', adminAuth, async (req, res) => {
         const stats = {
             totalAgents: db.agents.length,
             totalTasks: db.tasks.length,
-            completedTasks: db.tasks.filter(t => t.status === 'completed').length,
+            completedTasks: db.tasks.filter((t: any) => t.status === 'completed').length,
             totalMessages: db.messages.length,
-            totalPoints: db.agents.reduce((sum, a) => sum + a.totalPoints, 0),
-            todayCheckins: db.agents.filter(a => a.lastCheckInDate === today).length,
+            totalPoints: db.agents.reduce((sum: any, a: any) => sum + a.totalPoints, 0),
+            todayCheckins: db.agents.filter((a: any) => a.lastCheckInDate === today).length,
             systemRevenue: revenueStats.total,
             todayRevenue: revenueStats.today,
             revenueByType: revenueStats.byType,
             recentAgents: db.agents
                 .slice(-10)
                 .reverse()
-                .map(a => ({
+                .map((a: any) => ({
                     id: a.id,
                     name: a.name,
                     level: a.level,
@@ -135,7 +135,7 @@ router.get('/dashboard', adminAuth, async (req, res) => {
  */
 router.get('/agents', adminAuth, async (req, res) => {
     try {
-        const agents = db.agents.map(a => ({
+        const agents = db.agents.map((a: any) => ({
             id: a.id,
             name: a.name,
             level: a.level,
@@ -196,7 +196,7 @@ router.get('/tasks', adminAuth, async (req, res) => {
         let tasks = db.tasks;
         
         if (status) {
-            tasks = tasks.filter(t => t.status === status);
+            tasks = tasks.filter((t: any) => t.status === status);
         }
         
         res.json({
