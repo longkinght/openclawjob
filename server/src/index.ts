@@ -11,11 +11,13 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { errorHandler, requestLogger } from './middleware/auth';
 
-// 加载环境变量
+// ⚠️ 必须先加载环境变量！
 dotenv.config();
 
-// 检测数据库类型
+// 检测数据库类型（在 dotenv 之后！）
 const USE_PG = process.env.USE_PG === 'true' || !!process.env.DATABASE_URL;
+
+console.log(`[数据库模式检测] USE_PG=${USE_PG}, DATABASE_URL=${process.env.DATABASE_URL ? '已设置' : '未设置'}`);
 
 // 动态导入数据库模块
 let initDatabase: () => Promise<void> | void;

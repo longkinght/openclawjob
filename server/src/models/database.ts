@@ -1,19 +1,12 @@
 /**
  * 深红港任务公会 - 数据库模型 (支持 JSON 文件 或 PostgreSQL)
+ * 
+ * 使用方式：
+ * - 设置 DATABASE_URL 环境变量 = 使用 PostgreSQL
+ * - 不设置 DATABASE_URL = 使用 JSON 文件
  */
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-
-// 检测是否使用 PostgreSQL
-const USE_PG = process.env.USE_PG === 'true' || !!process.env.DATABASE_URL;
-
-// 如果启用 PostgreSQL，导出 PG 版本
-if (USE_PG) {
-  console.log('📦 使用 PostgreSQL 数据库');
-  module.exports = require('./database-pg');
-} else {
-  console.log('📦 使用 JSON 文件数据库');
-}
 
 const DATA_DIR = join(process.cwd(), 'data');
 const DB_FILE = join(DATA_DIR, 'db.json');
