@@ -1,14 +1,77 @@
 /**
- * 深红港任务公会 - Agent 模型操作
+ * 深红港任务公会 - Agent 模型操作 (兼容 JSON 和 PostgreSQL)
  */
 import { db, findOne, findMany, insert, update } from './database';
+import { query } from './database-pg';
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, AgentRegisterInput, AutoAcceptRules } from '../types';
+
+const USE_PG = process.env.USE_PG === 'true' || !!process.env.DATABASE_URL;
 
 const LEVEL_TITLES = ['幼虾', '小虾', '青虾', '成虾', '大虾', '龙虾', '巨螯', '龙王'];
 const LEVEL_POINTS = [0, 100, 300, 600, 1000, 1500, 2500, 5000];
 const LEVEL_QUOTAS = [3, 5, 8, 10, 15, 18, 20, 25];
 const LEVEL_WORKLOADS = [2, 3, 4, 5, 6, 8, 10, 12];
+
+// PostgreSQL 结果转换为 Agent 对象
+function pgRowToAgent(row: any): Agent {
+  return {
+    id: row.id,
+    name: row.name,
+    ownerId: row.owner_id,
+    apiKey: row.api_key,
+    level: row.level,
+    totalPoints: row.total_points,
+    title: row.title,
+    skills: row.skills || [],
+    skillLevels: row.skill_levels || {},
+    balance: row.balance,
+    totalEarned: row.total_earned,
+    totalSpent: row.total_spent,
+    currentWorkload: row.current_workload,
+    maxWorkload: row.max_workload,
+    dailyQuota: row.daily_quota,
+    quotaUsedToday: row.quota_used_today,
+    quotaResetDate: row.quota_reset_date,
+    autoAccept: row.auto_accept,
+    autoAcceptRules: row.auto_accept_rules || { enabled: false, maxStar: 4, minReward: 30, maxConcurrent: 3, preferredTypes: [], excludeTags: [] },
+    stats: row.stats || { tasksCompleted: 0, tasksPublished: 0, helpReceived: 0, averageRating: 0 },
+    createdAt: row.created_at,
+    lastCheckInDate: row.last_check_in_date,
+    dailyTeahousePoints: row.daily_teahouse_points,
+    teahousePointsDate: row.teahouse_points_date,
+  };
+}
+
+// Agent 对象转换为 PostgreSQL 行
+function agentToPgRow(agent: Partial<Agent>): any {
+  return {
+    id: agent.id,
+    name: agent.name,
+    owner_id: agent.ownerId,
+    api_key: agent.apiKey,
+    level: agent.level,
+    total_points: agent.totalPoints,
+    title: agent.title,
+    skills: JSON.stringify(agent.skills || []),
+    skill_levels: JSON.stringify(agent.skillLevels || {}),
+    balance: agent.balance,
+    total_earned: agent.totalEarned,
+    total_spent: agent.totalSpent,
+    current_workload: agent.currentWorkload,
+    max_workload: agent.maxWorkload,
+    daily_quota: agent.dailyQuota,
+    quota_used_today: agent.quotaUsedToday,
+    quota_reset_date: agent.quotaResetDate,
+    auto_accept: agent.autoAccept,
+    auto_accept_rules: JSON.stringify(agent.autoAcceptRules || { enabled: false, maxStar: 4, minReward: 30, maxConcurrent: 3, preferredTypes: [], excludeTags: [] }),
+    stats: JSON.stringify(agent.stats || { tasksCompleted: 0, tasksPublished: 0, helpReceived: 0, averageRating: 0 }),
+    created_at: agent.createdAt,
+    last_check_in_date: agent.lastCheckInDate,
+    daily_teahouse_points: agent.dailyTeahousePoints,
+    teahouse_points_date: agent.teahousePointsDate,
+  };
+}
 
 export class AgentModel {
   static generateId(): string {
@@ -62,15 +125,35 @@ export class AgentModel {
     
     input.skills?.forEach(s => agent.skillLevels[s] = 1);
     
-    return await insert<Agent>('agents', agent);
+    if (USE_PG) {
+      const row = agentToPgRow(agent);
+      const columns = Object.keys(row);
+      const values = Object.values(row);
+      const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+      const sql = `INSERT INTO agents (${columns.join(', ')}) VALUES (${placeholders}) RETURNING *`;
+      const result = await query(sql, values);
+      return pgRowToAgent(result.rows[0]);
+    } else {
+      return await insert<Agent>('agents', agent);
+    }
   }
 
   static async findById(id: string): Promise<Agent | null> {
-    return await findOne<Agent>('agents', a => a.id === id);
+    if (USE_PG) {
+      const result = await query('SELECT * FROM agents WHERE id = $1', [id]);
+      return result.rows[0] ? pgRowToAgent(result.rows[0]) : null;
+    } else {
+      return await findOne<Agent>('agents', a => a.id === id);
+    }
   }
 
   static async findByApiKey(apiKey: string): Promise<Agent | null> {
-    return await findOne<Agent>('agents', a => a.apiKey === apiKey);
+    if (USE_PG) {
+      const result = await query('SELECT * FROM agents WHERE api_key = $1', [apiKey]);
+      return result.rows[0] ? pgRowToAgent(result.rows[0]) : null;
+    } else {
+      return await findOne<Agent>('agents', a => a.apiKey === apiKey);
+    }
   }
 
   static async checkAndResetQuota(agentId: string): Promise<void> {
@@ -84,9 +167,20 @@ export class AgentModel {
   }
 
   static async update(id: string, updates: Partial<Agent>): Promise<void> {
-    await update<Agent>('agents', a => a.id === id, a => {
-      Object.assign(a, updates);
-    });
+    if (USE_PG) {
+      const row = agentToPgRow(updates);
+      const entries = Object.entries(row).filter(([k, v]) => v !== undefined && k !== 'id');
+      if (entries.length === 0) return;
+      
+      const setClause = entries.map(([k], i) => `${k} = $${i + 2}`).join(', ');
+      const values = entries.map(([, v]) => v);
+      const sql = `UPDATE agents SET ${setClause} WHERE id = $1`;
+      await query(sql, [id, ...values]);
+    } else {
+      await update<Agent>('agents', a => a.id === id, a => {
+        Object.assign(a, updates);
+      });
+    }
   }
 
   static async addPoints(id: string, points: number, type: 'earn' | 'spend' = 'earn'): Promise<void> {
@@ -117,30 +211,52 @@ export class AgentModel {
   }
 
   static async getRanking(type: string, limit: number = 20): Promise<any[]> {
-    let sorted = [...db.agents];
-    
-    switch (type) {
-      case 'tasks-completed':
-        sorted.sort((a, b) => b.stats.tasksCompleted - a.stats.tasksCompleted);
-        break;
-      case 'rating':
-        sorted.sort((a, b) => b.stats.averageRating - a.stats.averageRating);
-        break;
-      case 'active':
-        sorted.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-        break;
-      default:
-        sorted.sort((a, b) => b.totalPoints - a.totalPoints);
-    }
+    if (USE_PG) {
+      let orderBy = 'total_points DESC';
+      if (type === 'tasks-completed') orderBy = "(stats->>'tasksCompleted')::int DESC";
+      if (type === 'rating') orderBy = "(stats->>'averageRating')::float DESC";
+      
+      const result = await query(`
+        SELECT id, name, level, total_points, stats 
+        FROM agents 
+        ORDER BY ${orderBy} 
+        LIMIT $1
+      `, [limit]);
+      
+      return result.rows.map((row, idx) => ({
+        rank: idx + 1,
+        agentId: row.id,
+        agentName: row.name,
+        agentLevel: row.level,
+        value: type === 'tasks-completed' ? (row.stats?.tasksCompleted || 0) :
+               type === 'rating' ? (row.stats?.averageRating || 0) : row.total_points
+      }));
+    } else {
+      let sorted = [...db.agents];
+      
+      switch (type) {
+        case 'tasks-completed':
+          sorted.sort((a, b) => b.stats.tasksCompleted - a.stats.tasksCompleted);
+          break;
+        case 'rating':
+          sorted.sort((a, b) => b.stats.averageRating - a.stats.averageRating);
+          break;
+        case 'active':
+          sorted.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+          break;
+        default:
+          sorted.sort((a, b) => b.totalPoints - a.totalPoints);
+      }
 
-    return sorted.slice(0, limit).map((row, idx) => ({
-      rank: idx + 1,
-      agentId: row.id,
-      agentName: row.name,
-      agentLevel: row.level,
-      value: type === 'tasks-completed' ? row.stats.tasksCompleted : 
-             type === 'rating' ? row.stats.averageRating : row.totalPoints
-    }));
+      return sorted.slice(0, limit).map((row, idx) => ({
+        rank: idx + 1,
+        agentId: row.id,
+        agentName: row.name,
+        agentLevel: row.level,
+        value: type === 'tasks-completed' ? row.stats.tasksCompleted :
+               type === 'rating' ? row.stats.averageRating : row.totalPoints
+      }));
+    }
   }
 
   /**

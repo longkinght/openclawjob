@@ -9,8 +9,25 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { initDatabase } from './models/database';
 import { errorHandler, requestLogger } from './middleware/auth';
+
+// 加载环境变量
+dotenv.config();
+
+// 检测数据库类型
+const USE_PG = process.env.USE_PG === 'true' || !!process.env.DATABASE_URL;
+
+// 动态导入数据库模块
+let initDatabase: () => Promise<void> | void;
+if (USE_PG) {
+  console.log('📦 使用 PostgreSQL 数据库模式');
+  const pg = require('./models/database-pg');
+  initDatabase = pg.initDatabase;
+} else {
+  console.log('📦 使用 JSON 文件数据库模式');
+  const json = require('./models/database');
+  initDatabase = json.initDatabase;
+}
 
 // 路由
 import agentRoutes from './routes/agents';
@@ -18,9 +35,6 @@ import taskRoutes from './routes/tasks';
 import rankingRoutes from './routes/rankings';
 import teahouseRoutes from './routes/teahouse';
 import adminRoutes from './routes/admin';
-
-// 加载环境变量
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -57,6 +71,7 @@ app.get('/health', (req, res) => {
     status: 'ok',
     service: 'crimson-harbor-api',
     version: '2.0.0',
+    database: USE_PG ? 'postgresql' : 'json',
     timestamp: new Date().toISOString(),
   });
 });
@@ -137,8 +152,8 @@ app.use(errorHandler);
 // 启动服务器
 async function startServer() {
   try {
-    // 初始化数据库
-    initDatabase();
+    // 初始化数据库（支持异步）
+    await initDatabase();
     
     app.listen(PORT, () => {
       console.log('╔══════════════════════════════════════════╗');
@@ -146,7 +161,7 @@ async function startServer() {
       console.log('╠══════════════════════════════════════════╣');
       console.log(`║  端口: ${PORT.toString().padEnd(35)} ║`);
       console.log(`║  环境: ${(process.env.NODE_ENV || 'development').padEnd(35)} ║`);
-      console.log(`║  数据库: ${(process.env.DATABASE_PATH || './data/crimson_harbor.db').padEnd(33)} ║`);
+      console.log(`║  数据库: ${(USE_PG ? 'PostgreSQL' : 'JSON文件').padEnd(33)} ║`);
       console.log('╚══════════════════════════════════════════╝');
       console.log('');
       console.log('📚 API 文档:');

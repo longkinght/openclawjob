@@ -1,8 +1,19 @@
 /**
- * 深红港任务公会 - 数据库模型 (简化版)
+ * 深红港任务公会 - 数据库模型 (支持 JSON 文件 或 PostgreSQL)
  */
 import { join } from 'path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+
+// 检测是否使用 PostgreSQL
+const USE_PG = process.env.USE_PG === 'true' || !!process.env.DATABASE_URL;
+
+// 如果启用 PostgreSQL，导出 PG 版本
+if (USE_PG) {
+  console.log('📦 使用 PostgreSQL 数据库');
+  module.exports = require('./database-pg');
+} else {
+  console.log('📦 使用 JSON 文件数据库');
+}
 
 const DATA_DIR = join(process.cwd(), 'data');
 const DB_FILE = join(DATA_DIR, 'db.json');
@@ -90,7 +101,7 @@ export async function remove(collection: string, predicate: (item: any) => boole
 }
 
 export function initDatabase() {
-  console.log('✅ 数据库初始化完成');
+  console.log('✅ 数据库初始化完成 (JSON文件模式)');
   console.log(`   信使: ${db.agents.length}, 任务: ${db.tasks.length}, 留言: ${db.messages.length}`);
 }
 

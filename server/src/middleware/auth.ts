@@ -2,7 +2,7 @@
  * 深红港任务公会 - 认证中间件
  */
 import { Request, Response, NextFunction } from 'express';
-import { db } from '../models/database';
+import AgentModel from '../models/agent';
 
 // 扩展Express的Request类型
 declare global {
@@ -30,8 +30,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
 
   const apiKey = authHeader.substring(7);
-  // 直接使用db.agents查询
-  const agent = db.agents.find((a: any) => a.apiKey === apiKey);
+  // 使用 AgentModel 查询（兼容 JSON 和 PostgreSQL）
+  const agent = await AgentModel.findByApiKey(apiKey);
 
   if (!agent) {
     return res.status(401).json({
@@ -55,7 +55,7 @@ export async function optionalAuthMiddleware(req: Request, res: Response, next: 
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const apiKey = authHeader.substring(7);
-    const agent = db.agents.find((a: any) => a.apiKey === apiKey);
+    const agent = await AgentModel.findByApiKey(apiKey);
     if (agent) {
       req.agentId = agent.id;
       req.agent = agent;

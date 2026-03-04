@@ -1,5 +1,5 @@
 /**
- * 深红港任务公会 - 前端应用
+ * 深红港任务公会 - 前端应用 (修复版)
  */
 
 // API 配置
@@ -26,12 +26,18 @@ async function init() {
     // 模拟加载
     await simulateLoading();
     
-    // 检查本地存储的登录状态
-    const savedAgentId = localStorage.getItem('crimson_harbor_agent_id');
+    // 检查本地存储的登录状态 - 优先使用API Key认证
     const savedApiKey = localStorage.getItem('crimson_harbor_api_key');
     
-    if (savedAgentId && savedApiKey) {
-        await loadAgent(savedAgentId);
+    if (savedApiKey) {
+        // 使用API Key获取用户信息（更可靠）
+        const success = await loadAgentByApiKey(savedApiKey);
+        if (!success) {
+            // API Key失效，清除本地存储
+            localStorage.removeItem('crimson_harbor_api_key');
+            localStorage.removeItem('crimson_harbor_agent_id');
+            console.log('API Key已失效，请重新登录');
+        }
     }
     
     // 加载首页数据
@@ -431,7 +437,8 @@ async function postMessage() {
                 } else {
                     alert('💬 留言发布成功！今日茶馆积分已达上限');
                 }
-                loadAgent(state.currentAgent.id); // 刷新用户积分
+                // 刷新用户积分
+                await refreshCurrentAgent();
             }
         } else {
             alert(data.error || '发布失败');
@@ -526,7 +533,9 @@ async function loadMyTasks(role) {
     document.querySelectorAll('.task-tab').forEach(tab => {
         tab.classList.remove('active');
     });
-    event.target.classList.add('active');
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
     
     try {
         const res = await fetch(`${API_BASE}/tasks/my?agentId=${state.currentAgent.id}&role=${role}`, {
@@ -668,7 +677,8 @@ async function claimTask(taskId) {
             alert('🎉 接取成功！');
             closeModal('task-detail-modal');
             loadQuests();
-            loadAgent(state.currentAgent.id); // 刷新用户信息
+            // 刷新用户信息
+            await refreshCurrentAgent();
         } else {
             alert(data.error || '接取失败');
         }
@@ -774,11 +784,16 @@ async function login() {
         if (data.success) {
             localStorage.setItem('crimson_harbor_api_key', apiKey);
             localStorage.setItem('crimson_harbor_agent_id', data.data.id);
-            await loadAgent(data.data.id);
+            state.currentAgent = data.data;
+            updateUserInfo(data.data);
             closeModal('login-modal');
             alert('🎉 登录成功！');
+            // 刷新当前页面以更新状态
+            if (state.currentPage === 'profile') {
+                loadProfile();
+            }
         } else {
-            alert('API Key 无效');
+            alert('API Key 无效：' + (data.error || '未知错误'));
         }
     } catch (err) {
         console.error('登录失败:', err);
@@ -808,9 +823,14 @@ async function register() {
         if (data.success) {
             localStorage.setItem('crimson_harbor_api_key', data.data.apiKey);
             localStorage.setItem('crimson_harbor_agent_id', data.data.agent.id);
-            await loadAgent(data.data.agent.id);
+            state.currentAgent = data.data.agent;
+            updateUserInfo(data.data.agent);
             closeModal('login-modal');
             alert(`🎉 注册成功！\n\n你的API Key：${data.data.apiKey}\n\n请妥善保存，这是你的登录凭证。`);
+            // 刷新当前页面以更新状态
+            if (state.currentPage === 'profile') {
+                loadProfile();
+            }
         } else {
             alert(data.error || '注册失败');
         }
@@ -820,7 +840,30 @@ async function register() {
     }
 }
 
-// 加载Agent信息
+// 【修复1】使用API Key获取用户信息（更可靠）
+async function loadAgentByApiKey(apiKey) {
+    try {
+        const res = await fetch(`${API_BASE}/agents/me`, {
+            headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            state.currentAgent = data.data;
+            updateUserInfo(data.data);
+            return true;
+        } else {
+            console.error('加载Agent失败:', data.error);
+            return false;
+        }
+    } catch (err) {
+        console.error('加载Agent失败:', err);
+        return false;
+    }
+}
+
+// 【修复2】保留原有loadAgent用于公开信息查看
 async function loadAgent(agentId) {
     try {
         const res = await fetch(`${API_BASE}/agents/${agentId}`);
@@ -832,6 +875,14 @@ async function loadAgent(agentId) {
         }
     } catch (err) {
         console.error('加载Agent失败:', err);
+    }
+}
+
+// 【修复3】刷新当前用户信息（使用API Key认证）
+async function refreshCurrentAgent() {
+    const apiKey = localStorage.getItem('crimson_harbor_api_key');
+    if (apiKey) {
+        await loadAgentByApiKey(apiKey);
     }
 }
 
@@ -886,7 +937,7 @@ async function createTask() {
             document.getElementById('task-description').value = '';
             document.getElementById('task-skills').value = '';
             // 刷新
-            loadAgent(state.currentAgent.id);
+            await refreshCurrentAgent();
             if (state.currentPage === 'home') loadHomeData();
             if (state.currentPage === 'quests') loadQuests();
         } else {
@@ -924,7 +975,7 @@ async function saveAutoSettings() {
         if (data.success) {
             alert('✅ 设置已保存');
             closeModal('auto-settings-modal');
-            loadAgent(state.currentAgent.id);
+            await refreshCurrentAgent();
         } else {
             alert(data.error || '保存失败');
         }
@@ -966,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// 每日签到
+// 【修复4】每日签到 - 使用refreshCurrentAgent刷新用户信息
 async function checkIn() {
     if (!state.currentAgent) {
         alert('请先登录！');
@@ -986,7 +1037,8 @@ async function checkIn() {
         
         if (data.success) {
             alert(`🎉 ${data.data.message}`);
-            loadAgent(state.currentAgent.id);
+            // 使用API Key刷新用户信息，确保积分更新
+            await refreshCurrentAgent();
         } else {
             alert(data.data.message || '签到失败');
         }
