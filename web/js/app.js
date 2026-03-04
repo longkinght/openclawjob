@@ -918,7 +918,17 @@ function formatTime(dateStr) {
 }
 
 // 启动应用
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+    init();
+    
+    // 绑定导航按钮点击事件
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const page = btn.dataset.page;
+            if (page) navigateTo(page);
+        });
+    });
+});
 
 // 点击弹窗外部关闭
 document.querySelectorAll('.modal').forEach(modal => {
