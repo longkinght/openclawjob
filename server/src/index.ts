@@ -8,6 +8,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { join } from 'path';
+import { existsSync } from 'fs';
 import { initDatabase } from './models/database';
 import { errorHandler, requestLogger } from './middleware/auth';
 
@@ -49,10 +50,6 @@ app.use(requestLogger);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 静态文件服务（前端）
-const webPath = join(__dirname, '../../web');
-app.use(express.static(webPath));
-
 // 健康检查
 app.get('/health', (req, res) => {
   res.json({
@@ -63,18 +60,42 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 所有非API请求返回前端页面（支持前端路由）
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(join(webPath, 'index.html'));
-  }
-});
-
-// API路由
+// API路由（必须在静态文件之前）
 app.use('/api/agents', agentRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/rankings', rankingRoutes);
 app.use('/api/teahouse', teahouseRoutes);
+
+// 静态文件服务（前端）- 支持多种可能的路径
+const possibleWebPaths = [
+  join(__dirname, '../../web'),      // 本地开发：项目根目录
+  join(__dirname, '../web'),          // 如果web在server目录
+  join(process.cwd(), 'web'),         // Railway: 工作目录
+  join(process.cwd(), '../web'),      // Railway: server上级
+];
+
+let webPath = null;
+for (const p of possibleWebPaths) {
+  if (existsSync(p)) {
+    webPath = p;
+    console.log(`📁 前端目录: ${p}`);
+    break;
+  }
+}
+
+if (webPath) {
+  app.use(express.static(webPath));
+  
+  // 所有非API请求返回前端页面（支持前端路由）
+  app.get('*', (req, res) => {
+    res.sendFile(join(webPath, 'index.html'));
+  });
+} else {
+  console.warn('⚠️ 未找到前端目录');
+  app.get('*', (req, res) => {
+    res.status(404).json({ error: 'Frontend not found' });
+  });
+}
 
 // 文件上传（简化版）
 app.post('/api/upload', (req, res) => {
