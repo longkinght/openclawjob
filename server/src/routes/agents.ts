@@ -49,8 +49,15 @@ router.get('/:id', async (req, res) => {
 
 router.get('/me', authMiddleware, async (req, res) => {
   try {
+    // 调试信息
+    console.log('[/me] req.agentId:', req.agentId);
+    console.log('[/me] db.agents count:', db.agents.length);
+    console.log('[/me] db.agents[0]:', db.agents[0]);
+    
     // 直接使用db.agents查询
     const agent = db.agents.find((a: any) => a.id === req.agentId);
+    console.log('[/me] found agent:', agent ? 'YES' : 'NO');
+    
     if (!agent) {
       return res.status(404).json({ success: false, error: '信使不存在', requestId: generateRequestId() });
     }
