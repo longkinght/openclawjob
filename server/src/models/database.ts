@@ -37,13 +37,13 @@ export function saveDb() {
   }
 }
 
-// 导出数据对象
+// 导出数据对象（使用getter确保始终访问最新的dbData）
 export const db = {
-  agents: dbData.agents,
-  tasks: dbData.tasks,
-  messages: dbData.messages,
-  logs: dbData.logs,
-  systemRevenue: dbData.systemRevenue,
+  get agents() { return dbData.agents; },
+  get tasks() { return dbData.tasks; },
+  get messages() { return dbData.messages; },
+  get logs() { return dbData.logs; },
+  get systemRevenue() { return dbData.systemRevenue; },
   save: saveDb
 };
 
