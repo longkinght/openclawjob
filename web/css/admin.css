@@ -535,6 +535,46 @@ input[type="checkbox"] {
     accent-color: var(--color-primary);
 }
 
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+/* Modal Actions */
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-close:hover {
+    color: var(--color-text);
+}
+
+.btn-danger {
+    color: var(--color-error);
+}
+
+.btn-danger:hover {
+    background: var(--color-error);
+    color: white;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .sidebar {
