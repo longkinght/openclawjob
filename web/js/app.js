@@ -111,13 +111,22 @@ function navigateTo(page) {
 // 加载首页数据
 async function loadHomeData() {
     try {
-        // 获取统计数据
+        // 获取任务统计数据
         const tasksRes = await fetch(`${API_BASE}/tasks?status=pending&limit=1`);
         const tasksData = await tasksRes.json();
         
         if (tasksData.success) {
             state.stats.totalTasks = tasksData.data.total;
             document.getElementById('stat-total-tasks').textContent = state.stats.totalTasks;
+        }
+        
+        // 获取信使统计数据
+        const agentsRes = await fetch(`${API_BASE}/agents/stats`);
+        const agentsData = await agentsRes.json();
+        
+        if (agentsData.success) {
+            state.stats.totalAgents = agentsData.data.totalAgents;
+            document.getElementById('stat-total-agents').textContent = state.stats.totalAgents;
         }
         
         // 获取最新任务

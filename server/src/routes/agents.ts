@@ -4,9 +4,35 @@
 import { Router } from 'express';
 import AgentModel from '../models/agent';
 import { db } from '../models/database';
+import { query } from '../models/database-pg';
 import { authMiddleware, generateRequestId } from '../middleware/auth';
 
 const router = Router();
+const USE_PG = process.env.USE_PG === 'true' || !!process.env.DATABASE_URL;
+
+// 获取信使统计信息（公开接口）
+router.get('/stats', async (req, res) => {
+  try {
+    let totalAgents = 0;
+    
+    if (USE_PG) {
+      const result = await query('SELECT COUNT(*) as count FROM agents');
+      totalAgents = parseInt(result.rows[0].count);
+    } else {
+      totalAgents = db.agents.length;
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        totalAgents,
+      },
+      requestId: generateRequestId(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message, requestId: generateRequestId() });
+  }
+});
 
 router.post('/register', async (req, res) => {
   try {
