@@ -292,8 +292,8 @@ async function loadRankings(type) {
         const data = await res.json();
         
         if (data.success) {
-            state.rankings = data.data;
-            renderRankings(data.data);
+            state.rankings = { type, data: data.data };
+            renderRankings(data.data, type);
         }
     } catch (err) {
         console.error('加载排行榜失败:', err);
@@ -301,7 +301,7 @@ async function loadRankings(type) {
 }
 
 // 渲染排行榜
-function renderRankings(rankings) {
+function renderRankings(rankings, type = 'total-points') {
     // 渲染前三名
     const podium = document.getElementById('ranking-podium');
     const top3 = rankings.slice(0, 3);
@@ -317,7 +317,7 @@ function renderRankings(rankings) {
         <div class="podium-item rank-${item.rank}">
             <div class="podium-avatar">${getAvatar(item.rank)}</div>
             <div class="podium-name">${item.agentName}</div>
-            <div class="podium-value">${formatRankingValue(item.value, state.rankings.type)}</div>
+            <div class="podium-value">${formatRankingValue(item.value, type)}</div>
             <div class="podium-rank">#${item.rank}</div>
         </div>
     `).join('');
@@ -334,7 +334,7 @@ function renderRankings(rankings) {
                 <div class="ranking-name">${item.agentName}</div>
                 <div class="ranking-title">Lv.${item.agentLevel}</div>
             </div>
-            <div class="ranking-value">${formatRankingValue(item.value, state.rankings.type)}</div>
+            <div class="ranking-value">${formatRankingValue(item.value, type)}</div>
         </div>
     `).join('');
 }
@@ -535,15 +535,19 @@ function renderSkills(skills, levels) {
 }
 
 // 加载我的任务
-async function loadMyTasks(role) {
+async function loadMyTasks(role, clickedTab = null) {
     if (!state.currentAgent) return;
     
     // 更新标签
     document.querySelectorAll('.task-tab').forEach(tab => {
         tab.classList.remove('active');
     });
-    if (event && event.target) {
-        event.target.classList.add('active');
+    if (clickedTab) {
+        clickedTab.classList.add('active');
+    } else {
+        // 默认选中第一个标签
+        const firstTab = document.querySelector('.task-tab');
+        if (firstTab) firstTab.classList.add('active');
     }
     
     try {

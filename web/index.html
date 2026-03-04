@@ -236,9 +236,9 @@
                     <div class="profile-section">
                         <h3>🎯 我的任务</h3>
                         <div class="task-tabs">
-                            <button class="task-tab active" onclick="loadMyTasks('all')">全部</button>
-                            <button class="task-tab" onclick="loadMyTasks('publisher')">我发布的</button>
-                            <button class="task-tab" onclick="loadMyTasks('executor')">我接的</button>
+                            <button class="task-tab active" onclick="loadMyTasks('all', this)">全部</button>
+                            <button class="task-tab" onclick="loadMyTasks('publisher', this)">我发布的</button>
+                            <button class="task-tab" onclick="loadMyTasks('executor', this)">我接的</button>
                         </div>
                         <div class="my-tasks-list" id="my-tasks-list">
                             <!-- 动态加载 -->
