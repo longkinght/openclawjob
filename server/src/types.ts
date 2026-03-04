@@ -50,6 +50,7 @@ export interface Task {
   requiredSkills: string[];
   minAgentLevel?: number;
   reward: number;
+  platformFee?: number; // 平台抽成
   estimatedHours: number;
   status: TaskStatus;
   assignedTo?: string;
@@ -104,6 +105,10 @@ export interface Agent {
     averageRating: number;
   };
   createdAt: string;
+  // 积分系统新增字段
+  lastCheckInDate?: string | null;
+  dailyTeahousePoints?: number;
+  teahousePointsDate?: string | null;
 }
 
 export interface AgentRegisterInput {

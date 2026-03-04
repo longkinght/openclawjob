@@ -49,18 +49,44 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, error: '缺少必需参数', requestId: generateRequestId() });
     }
 
+    const rewardNum = parseInt(reward);
+    const platformFee = AgentModel.calculatePublishingFee(rewardNum);
+    const totalCost = rewardNum + platformFee;
+
     const agent = await AgentModel.findById(req.agentId!);
-    if (agent && agent.balance < reward) {
-      return res.status(400).json({ success: false, error: '积分余额不足', hint: '请完成更多任务赚取积分', requestId: generateRequestId() });
+    if (!agent) {
+      return res.status(404).json({ success: false, error: '信使不存在', requestId: generateRequestId() });
+    }
+    
+    if (agent.balance < totalCost) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '积分余额不足', 
+        hint: `发布此任务需要 ${totalCost} 积分（悬赏 ${rewardNum} + 平台抽成 ${platformFee}）`,
+        required: totalCost,
+        current: agent.balance,
+        requestId: generateRequestId() 
+      });
     }
 
     const task = await TaskModel.create({
       title, description, category, executorType: executorType || 'any', requiredSkills: requiredSkills || [],
-      reward: parseInt(reward), estimatedHours: parseFloat(estimatedHours), deadline, urgency: urgency || 'normal',
-      publisherId: req.agentId!, publisherType: 'agent', publisherName: agent?.name || '未知',
+      reward: rewardNum, estimatedHours: parseFloat(estimatedHours), deadline, urgency: urgency || 'normal',
+      publisherId: req.agentId!, publisherType: 'agent', publisherName: agent.name,
     });
 
-    res.json({ success: true, data: { task, balance: agent ? agent.balance - reward : 0 }, requestId: generateRequestId() });
+    res.json({ 
+      success: true, 
+      data: { 
+        task, 
+        balance: agent.balance - totalCost,
+        feeBreakdown: {
+          reward: rewardNum,
+          platformFee: platformFee
+        }
+      }, 
+      requestId: generateRequestId() 
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message, requestId: generateRequestId() });
   }

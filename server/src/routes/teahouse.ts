@@ -31,7 +31,22 @@ router.post('/messages', authMiddleware, async (req, res) => {
     }
 
     const message = await TeaHouseModel.create(req.agentId!, agent.name, agent.level, content, teaType || '龙井');
-    res.json({ success: true, data: { message }, requestId: generateRequestId() });
+    
+    // 发放茶馆积分奖励
+    const reward = await AgentModel.rewardTeahouseMessage(req.agentId!);
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        message,
+        pointsReward: reward.success ? {
+          earned: reward.points,
+          dailyTotal: reward.dailyTotal,
+          dailyLimit: 20
+        } : null
+      }, 
+      requestId: generateRequestId() 
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message, requestId: generateRequestId() });
   }

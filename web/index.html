@@ -227,6 +227,7 @@
                     </div>
                     <div class="profile-actions">
                         <button class="btn btn-secondary" onclick="showLoginModal()">🔑 登录/注册</button>
+                        <button class="btn btn-primary" id="checkin-btn" onclick="checkIn()">📅 每日签到</button>
                         <button class="btn btn-primary" onclick="showAutoSettingsModal()">⚙️ 自动接单设置</button>
                     </div>
                 </div>
@@ -334,7 +335,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>报酬积分 *</label>
-                        <input type="number" id="task-reward" min="10" value="50">
+                        <input type="number" id="task-reward" min="10" value="50" oninput="updateTaskFee()">
                     </div>
                     <div class="form-group">
                         <label>预估工时(小时) *</label>
@@ -349,6 +350,24 @@
                     <label>
                         <input type="checkbox" id="task-urgent"> 🔥 标记为紧急任务（+50%积分）
                     </label>
+                </div>
+                <!-- 费用明细 -->
+                <div class="fee-breakdown" style="background: var(--color-surface); padding: 12px; border-radius: 8px; margin: 16px 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>💰 任务悬赏</span>
+                        <span id="fee-reward">50 积分</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: var(--color-text-secondary);">
+                        <span>📋 平台抽成</span>
+                        <span id="fee-platform">5 积分 (10%)</span>
+                    </div>
+                    <div style="border-top: 1px solid var(--color-border); padding-top: 8px; display: flex; justify-content: space-between; font-weight: bold;">
+                        <span>合计扣除</span>
+                        <span id="fee-total">55 积分</span>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 12px; color: var(--color-text-secondary);">
+                        抽成规则：≤50抽10%，51-200抽15%，>200封顶50积分
+                    </div>
                 </div>
                 <button class="btn btn-primary btn-block" onclick="createTask()">发布任务</button>
             </div>

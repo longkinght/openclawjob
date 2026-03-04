@@ -44,8 +44,8 @@ export class AgentModel {
       title: '幼虾',
       skills: input.skills || [],
       skillLevels: {},
-      balance: 0,
-      totalEarned: 0,
+      balance: 100, // 新用户赠送100积分
+      totalEarned: 100,
       totalSpent: 0,
       currentWorkload: 0,
       maxWorkload: LEVEL_WORKLOADS[0],
@@ -54,7 +54,10 @@ export class AgentModel {
       autoAccept: false,
       autoAcceptRules: { enabled: false, maxStar: 4, minReward: 30, maxConcurrent: 3, preferredTypes: [], excludeTags: [] },
       stats: { tasksCompleted: 0, tasksPublished: 0, helpReceived: 0, averageRating: 0 },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      lastCheckInDate: null,
+      dailyTeahousePoints: 0,
+      teahousePointsDate: null
     };
     
     input.skills?.forEach(s => agent.skillLevels[s] = 1);
@@ -138,6 +141,71 @@ export class AgentModel {
       value: type === 'tasks-completed' ? row.stats.tasksCompleted : 
              type === 'rating' ? row.stats.averageRating : row.totalPoints
     }));
+  }
+
+  /**
+   * 计算发布任务的抽成费用
+   * 规则：≤50抽10%，51-200抽15%，>200封顶50积分
+   */
+  static calculatePublishingFee(reward: number): number {
+    if (reward <= 50) {
+      return Math.max(5, Math.floor(reward * 0.1));
+    } else if (reward <= 200) {
+      return Math.floor(reward * 0.15);
+    } else {
+      return 50; // 封顶50积分
+    }
+  }
+
+  /**
+   * 每日签到
+   */
+  static async checkIn(agentId: string): Promise<{ success: boolean; points: number; message: string }> {
+    const agent = await this.findById(agentId);
+    if (!agent) return { success: false, points: 0, message: '用户不存在' };
+
+    const today = new Date().toISOString().split('T')[0];
+    if (agent.lastCheckInDate === today) {
+      return { success: false, points: 0, message: '今日已签到' };
+    }
+
+    const points = 10; // 签到奖励10积分
+    await this.addPoints(agentId, points, 'earn');
+    await this.update(agentId, { lastCheckInDate: today });
+
+    return { success: true, points, message: `签到成功！获得${points}积分` };
+  }
+
+  /**
+   * 茶馆发言奖励
+   */
+  static async rewardTeahouseMessage(agentId: string): Promise<{ success: boolean; points: number; dailyTotal: number }> {
+    const agent = await this.findById(agentId);
+    if (!agent) return { success: false, points: 0, dailyTotal: 0 };
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 检查是否需要重置每日计数
+    if (agent.teahousePointsDate !== today) {
+      await this.update(agentId, { 
+        dailyTeahousePoints: 0,
+        teahousePointsDate: today 
+      });
+    }
+
+    const currentPoints = (agent.teahousePointsDate === today ? agent.dailyTeahousePoints : 0) || 0;
+    if (currentPoints >= 20) {
+      return { success: false, points: 0, dailyTotal: currentPoints };
+    }
+
+    const points = 2; // 每条消息2积分
+    await this.addPoints(agentId, points, 'earn');
+    await this.update(agentId, { 
+      dailyTeahousePoints: currentPoints + points,
+      teahousePointsDate: today
+    });
+
+    return { success: true, points, dailyTotal: currentPoints + points };
   }
 }
 

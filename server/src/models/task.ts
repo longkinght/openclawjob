@@ -47,6 +47,10 @@ export class TaskModel {
   }
 
   static async create(input: TaskInput & { publisherId: string; publisherType: 'human' | 'agent'; publisherName: string }): Promise<Task> {
+    // 计算抽成费用
+    const platformFee = AgentModel.calculatePublishingFee(input.reward);
+    const totalCost = input.reward + platformFee;
+
     const task: Task = {
       id: `task_${uuidv4().replace(/-/g, '').substring(0, 16)}`,
       title: input.title,
@@ -61,6 +65,7 @@ export class TaskModel {
       requiredSkills: input.requiredSkills,
       minAgentLevel: input.minAgentLevel || 1,
       reward: input.reward,
+      platformFee: platformFee,
       estimatedHours: input.estimatedHours,
       status: 'pending',
       createdAt: new Date().toISOString()
@@ -73,10 +78,10 @@ export class TaskModel {
     if (input.publisherType === 'agent') {
       const agent = await AgentModel.findById(input.publisherId);
       if (agent) {
-        await AgentModel.update(input.publisherId, {
-          balance: agent.balance - input.reward
-        });
+        // 扣除悬赏金额 + 平台抽成
+        await AgentModel.addPoints(input.publisherId, totalCost, 'spend');
         agent.stats.tasksPublished++;
+        await AgentModel.update(input.publisherId, { stats: agent.stats });
       }
     }
 
@@ -161,19 +166,25 @@ export class TaskModel {
     });
 
     if (task.assignedTo) {
-      const points = this.calculatePoints(task.starLevel, { goodReview: (rating || 0) >= 4, emergency: task.tags?.urgency === 'emergency' });
-      await AgentModel.addPoints(task.assignedTo, points, 'earn');
+      // 执行者获得：悬赏金额 - 平台抽成
+      const executorReward = task.reward - (task.platformFee || 0);
+      // 加上星级奖励
+      const bonusPoints = this.calculatePoints(task.starLevel, { goodReview: (rating || 0) >= 4, emergency: task.tags?.urgency === 'emergency' });
+      const totalReward = Math.max(0, executorReward) + bonusPoints;
+      
+      await AgentModel.addPoints(task.assignedTo, totalReward, 'earn');
 
-      if (rating) {
-        const agent = await AgentModel.findById(task.assignedTo);
-        if (agent) {
+      const agent = await AgentModel.findById(task.assignedTo);
+      if (agent) {
+        if (rating) {
           const newAvg = (agent.stats.averageRating * agent.stats.tasksCompleted + rating) / (agent.stats.tasksCompleted + 1);
           agent.stats.averageRating = newAvg;
-          agent.stats.tasksCompleted++;
-          await AgentModel.update(task.assignedTo, {
-            currentWorkload: agent.currentWorkload - 1
-          });
         }
+        agent.stats.tasksCompleted++;
+        await AgentModel.update(task.assignedTo, {
+          currentWorkload: Math.max(0, agent.currentWorkload - 1),
+          stats: agent.stats
+        });
       }
     }
 

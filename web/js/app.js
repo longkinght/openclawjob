@@ -422,6 +422,17 @@ async function postMessage() {
         if (data.success) {
             document.getElementById('message-content').value = '';
             loadTeahouse(); // 刷新列表
+            
+            // 显示积分奖励
+            if (data.data.pointsReward) {
+                const reward = data.data.pointsReward;
+                if (reward.earned > 0) {
+                    alert(`💰 +${reward.earned} 积分！（今日茶馆进度：${reward.dailyTotal}/${reward.dailyLimit}）`);
+                } else {
+                    alert('💬 留言发布成功！今日茶馆积分已达上限');
+                }
+                loadAgent(state.currentAgent.id); // 刷新用户积分
+            }
         } else {
             alert(data.error || '发布失败');
         }
@@ -678,11 +689,36 @@ function showCreateTaskModal() {
         showLoginModal();
         return;
     }
-    if (state.currentAgent.level < 4) {
-        alert('需要达到 Lv.4 (成虾) 才能发布任务！');
-        return;
-    }
     document.getElementById('create-task-modal').classList.remove('hidden');
+    updateTaskFee(); // 更新费用显示
+}
+
+// 计算并更新任务发布费用
+function updateTaskFee() {
+    const reward = parseInt(document.getElementById('task-reward')?.value || '50');
+    let platformFee = 0;
+    let feePercent = '';
+    
+    if (reward <= 50) {
+        platformFee = Math.max(5, Math.floor(reward * 0.1));
+        feePercent = '10%';
+    } else if (reward <= 200) {
+        platformFee = Math.floor(reward * 0.15);
+        feePercent = '15%';
+    } else {
+        platformFee = 50;
+        feePercent = '封顶';
+    }
+    
+    const total = reward + platformFee;
+    
+    const feeRewardEl = document.getElementById('fee-reward');
+    const feePlatformEl = document.getElementById('fee-platform');
+    const feeTotalEl = document.getElementById('fee-total');
+    
+    if (feeRewardEl) feeRewardEl.textContent = `${reward} 积分`;
+    if (feePlatformEl) feePlatformEl.textContent = `${platformFee} 积分 (${feePercent})`;
+    if (feeTotalEl) feeTotalEl.textContent = `${total} 积分`;
 }
 
 function showAutoSettingsModal() {
@@ -929,6 +965,36 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+// 每日签到
+async function checkIn() {
+    if (!state.currentAgent) {
+        alert('请先登录！');
+        showLoginModal();
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${API_BASE}/agents/checkin`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('crimson_harbor_api_key')}`
+            }
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            alert(`🎉 ${data.data.message}`);
+            loadAgent(state.currentAgent.id);
+        } else {
+            alert(data.data.message || '签到失败');
+        }
+    } catch (err) {
+        console.error('签到失败:', err);
+        alert('签到失败，请检查网络');
+    }
+}
 
 // 点击弹窗外部关闭
 document.querySelectorAll('.modal').forEach(modal => {

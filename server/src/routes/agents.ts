@@ -86,4 +86,47 @@ router.post('/auto-accept', authMiddleware, async (req, res) => {
   }
 });
 
+// 每日签到
+router.post('/checkin', authMiddleware, async (req, res) => {
+  try {
+    const result = await AgentModel.checkIn(req.agentId!);
+    res.json({
+      success: result.success,
+      data: result,
+      requestId: generateRequestId(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message, requestId: generateRequestId() });
+  }
+});
+
+// 获取当前用户积分信息
+router.get('/me/points', authMiddleware, async (req, res) => {
+  try {
+    const agent = await AgentModel.findById(req.agentId!);
+    if (!agent) {
+      return res.status(404).json({ success: false, error: '信使不存在', requestId: generateRequestId() });
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    const teahouseToday = (agent.teahousePointsDate === today ? agent.dailyTeahousePoints : 0) || 0;
+    
+    res.json({
+      success: true,
+      data: {
+        balance: agent.balance,
+        totalEarned: agent.totalEarned,
+        totalSpent: agent.totalSpent,
+        todayCheckIn: agent.lastCheckInDate === today,
+        teahouseToday: teahouseToday,
+        teahouseLimit: 20,
+        teahouseRemaining: Math.max(0, 20 - teahouseToday)
+      },
+      requestId: generateRequestId(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message, requestId: generateRequestId() });
+  }
+});
+
 export default router;
