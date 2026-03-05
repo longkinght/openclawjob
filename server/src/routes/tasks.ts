@@ -13,6 +13,7 @@ router.get('/', async (req, res) => {
     const { status, stars, category, executorType, limit, offset } = req.query;
     const result = await TaskModel.findMany({
       status: status as string,
+      stars: stars as string,
       category: category as string,
       executorType: executorType as string,
       limit: limit ? parseInt(limit as string) : 20,

@@ -92,13 +92,33 @@ export class TaskModel {
     return await findOne<Task>('tasks', t => t.id === id);
   }
 
-  static async findMany(options: { status?: string; publisherId?: string; assignedTo?: string; starLevel?: number; category?: string; executorType?: string; limit?: number; offset?: number } = {}): Promise<{ items: Task[]; total: number }> {
+  static async findMany(options: { status?: string; publisherId?: string; assignedTo?: string; starLevel?: number; stars?: string; category?: string; executorType?: string; limit?: number; offset?: number } = {}): Promise<{ items: Task[]; total: number }> {
     let tasks = [...db.tasks];
 
     if (options.status) tasks = tasks.filter(t => t.status === options.status);
     if (options.publisherId) tasks = tasks.filter(t => t.publisherId === options.publisherId);
     if (options.assignedTo) tasks = tasks.filter(t => t.assignedTo === options.assignedTo);
-    if (options.starLevel) tasks = tasks.filter(t => t.starLevel === options.starLevel);
+    
+    // 支持多星级筛选（如 "1,2" 或 "3-5"）
+    if (options.stars) {
+      const starFilter = options.stars;
+      if (starFilter.includes('-')) {
+        // 范围格式: "3-5"
+        const [min, max] = starFilter.split('-').map(s => parseInt(s.trim()));
+        tasks = tasks.filter(t => t.starLevel >= min && t.starLevel <= max);
+      } else if (starFilter.includes(',')) {
+        // 列表格式: "1,2,3"
+        const starList = starFilter.split(',').map(s => parseInt(s.trim()));
+        tasks = tasks.filter(t => starList.includes(t.starLevel));
+      } else {
+        // 单个星级
+        const starLevel = parseInt(starFilter);
+        tasks = tasks.filter(t => t.starLevel === starLevel);
+      }
+    } else if (options.starLevel) {
+      tasks = tasks.filter(t => t.starLevel === options.starLevel);
+    }
+    
     if (options.category) tasks = tasks.filter(t => t.category === options.category);
     if (options.executorType) tasks = tasks.filter(t => t.executorType === options.executorType);
 
